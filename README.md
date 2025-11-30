@@ -17,7 +17,7 @@ It evaluates urgency, impact, effort, deadlines, and dependency chains to produc
 ### **1. Clone the Repository**
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/BrahmajiMothukuri/Smart_Task_Analyzer
 cd task-analyzer
 ```
 
