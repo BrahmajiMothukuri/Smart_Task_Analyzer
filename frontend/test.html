@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Tasks Debug</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; color:#222; padding:20px; background:#f7f8fb; }
+    .card{ background:#fff; padding:14px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.06); max-width:800px; margin:0 auto; }
+    input,select,button{ padding:8px 10px; margin:6px 0; width:100%; box-sizing:border-box; }
+    .row{ display:flex; gap:8px; }
+    .row > *{ flex:1; }
+    .muted { color:#666; font-size:0.9rem; }
+    .task-line { padding:6px 4px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .task-id { background:#eef6ff; color:#1a73e8; padding:4px 8px; border-radius:6px; font-weight:700; margin-right:8px; }
+    .task-left { display:flex; align-items:center; gap:8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Task Creator — Debug Version</h2>
+
+    <label>Title</label>
+    <input id="title" placeholder="Fix login bug">
+
+    <div class="row">
+      <div>
+        <label>Due date</label>
+        <input id="due_date" type="date">
+      </div>
+      <div>
+        <label>Estimated hours</label>
+        <input id="estimated_hours" type="number" step="0.5">
+      </div>
+      <div>
+        <label>Importance</label>
+        <input id="importance" type="number" min="1" max="10" value="5">
+      </div>
+    </div>
+
+    <label>Dependencies (comma separated)</label>
+    <input id="dependencies" placeholder="e.g. 1,2">
+
+    <button id="addBtn">Add Task (no network)</button>
+    <p id="status" style="color:green"></p>
+
+    <hr>
+
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button id="analyzeBtn">Analyze (will try fetch only on click)</button>
+      <select id="analyzeType" style="width:200px;">
+        <option>Fastest Wins</option>
+        <option>High Impact</option>
+        <option>Deadline Driven</option>
+        <option>Smart Balance</option>
+      </select>
+    </div>
+
+    <h3>Tasks</h3>
+    <div id="tasksList" style="min-height:40px; background:#fcfcfc; padding:8px; border-radius:6px;"></div>
+
+    <h3 id="recTitle" style="display:none">Recommended</h3>
+    <div id="recommended" style="min-height:40px; padding:8px;"></div>
+  </div>
+
+<script>
+(function(){
+  // small defensive script that only runs on button clicks
+  const tasks = [];
+  let nextId = 1;
+  const qs = sel => document.querySelector(sel);
+
+  function renderTasks(){
+    const el = qs('#tasksList');
+    el.innerHTML = '';
+    tasks.forEach(t => {
+      const d = document.createElement('div');
+      d.className = 'task-line';
+      const left = document.createElement('div');
+      left.className = 'task-left';
+      const idSpan = document.createElement('span');
+      idSpan.className = 'task-id';
+      idSpan.textContent = t.id;
+      const titleSpan = document.createElement('div');
+      titleSpan.innerHTML = `<strong>${escapeHtml(t.title)}</strong><div class="muted">Due: ${t.due_date} • Est: ${t.estimated_hours}h • Imp: ${t.importance}</div>`;
+      left.appendChild(idSpan);
+      left.appendChild(titleSpan);
+
+      const right = document.createElement('div');
+      right.className = 'muted';
+      right.textContent = `created ${new Date(t.created_at).toLocaleString()}`;
+
+      d.appendChild(left);
+      d.appendChild(right);
+      el.appendChild(d);
+    });
+  }
+
+  function escapeHtml(s){
+    if(!s) return '';
+    return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+  }
+
+  qs('#addBtn').addEventListener('click', () => {
+    const title = qs('#title').value.trim();
+    const due_date = qs('#due_date').value;
+    const est = qs('#estimated_hours').value.trim();
+    const importanceVal = qs('#importance').value.trim();
+    const depsRaw = qs('#dependencies').value.trim();
+
+    // basic validation
+    if(!title || !due_date){
+      qs('#status').style.color='red';
+      qs('#status').textContent='Title and due date required';
+      return;
+    }
+
+    // parse and validate estimated_hours
+    const estimated_hours = est === '' ? null : Number(est);
+    if(estimated_hours === null || isNaN(estimated_hours)){
+      qs('#status').style.color='red';
+      qs('#status').textContent='Estimated hours required and must be a number';
+      return;
+    }
+
+    // parse and validate importance
+    const importance = importanceVal === '' ? null : Number(importanceVal);
+    if(importance === null || isNaN(importance) || importance < 1 || importance > 10){
+      qs('#status').style.color='red';
+      qs('#status').textContent='Importance must be a number between 1 and 10';
+      return;
+    }
+
+    // parse dependencies input into array of unique positive integer ids
+    let dependencies = [];
+    if(depsRaw !== ''){
+      dependencies = depsRaw.split(',')
+        .map(s => s.trim())
+        .filter(s => s !== '')
+        .map(s => Number(s))
+        .filter(n => Number.isInteger(n) && n > 0);
+      // dedupe
+      dependencies = Array.from(new Set(dependencies));
+    }
+
+    // Check that all dependency IDs exist in current tasks
+    const missing = dependencies.filter(id => !tasks.some(t => t.id === id));
+    if(missing.length > 0){
+      qs('#status').style.color='red';
+      qs('#status').textContent = 'No task with id: ' + missing.join(', ');
+      return;
+    }
+
+    // All good — create task with dependencies as list of ids
+    const t = {
+      id: nextId++,
+      title,
+      due_date,
+      estimated_hours,
+      importance,
+      dependencies,      // list of task IDs
+      created_at: new Date().toISOString()
+    };
+
+    tasks.push(t);
+    renderTasks();
+    qs('#status').style.color='green';
+    qs('#status').textContent = 'Task added locally. No network used.';
+
+    // clear inputs (except importance keep default)
+    qs('#title').value = '';
+    qs('#due_date').value = '';
+    qs('#estimated_hours').value = '';
+    qs('#dependencies').value = '';
+  });
+
+  qs('#analyzeBtn').addEventListener('click', async () => {
+    if(tasks.length===0){ alert('Add a task first'); return;}
+    qs('#status').style.color='black';
+    qs('#status').textContent = 'Preparing analyze payload...';
+
+    const payload = { Tasks: tasks, analyseType: qs('#analyzeType').value };
+
+    // NOTE: This fetch only runs when you click the analyze button.
+    // If your backend is at localhost:4000 change the URL below.
+    const url = 'http://127.0.0.1:8000/api/tasks/analyze/'; // adjust if needed
+    try{
+      const res = await fetch(url, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if(!res.ok){
+        const txt = await res.text();
+        qs('#status').style.color='red';
+        qs('#status').textContent = 'Server returned error: ' + txt;
+        return;
+      }
+
+      const json = await res.json();
+      const recommended = json.recommended || json.recommendations || json.Tasks || [];
+      qs('#recTitle').style.display = 'block';
+      const recEl = qs('#recommended');
+      recEl.innerHTML = '';
+      (recommended||[]).forEach(r => {
+        const d = document.createElement('div');
+        d.textContent = (r.title || r.name || 'Task') + (r.due_date ? (' — ' + r.due_date) : '');
+        recEl.appendChild(d);
+      });
+      qs('#status').style.color='green';
+      qs('#status').textContent = 'Analyze succeeded (response parsed).';
+    }catch(err){
+      console.log(err);
+      console.log(err.text);
+      qs('#status').style.color='red';
+      qs('#status').textContent = 'Fetch failed: ' + err.message + ' (check backend URL / CORS)';
+    }
+  });
+
+})();
+</script>
+</body>
+</html>

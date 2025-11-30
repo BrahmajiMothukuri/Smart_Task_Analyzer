@@ -172,3 +172,73 @@ Ensures correctness but may be slower for very large graphs (acceptable for typi
 * Deploy to cloud (Render / Railway / AWS)
 
 ---
+## 🧪 Unit Test Cases
+
+Below are the official unit test inputs used to validate the Smart Task Analyzer logic.
+
+---
+
+### **📌 Test Case 1 — Dependency Ordering & Smart Priority**
+This test ensures:
+- No cycle exists  
+- Tasks are ordered respecting dependencies  
+- Smart algorithm returns valid top results  
+
+**Input:**
+```json
+[
+  {"id":1,"title":"Research","due_date":"2025-11-20","estimated_hours":12,"importance":14,"dependencies":[],"created_at":"2025-11-01T09:00:00.000Z"},
+  {"id":2,"title":"QuickBug","due_date":"2025-11-25","estimated_hours":1,"importance":12,"dependencies":[],"created_at":"2025-11-02T10:00:00.000Z"},
+  {"id":3,"title":"FeatureA","due_date":"2025-12-01","estimated_hours":8,"importance":10,"dependencies":[1,2],"created_at":"2025-11-03T11:00:00.000Z"},
+  {"id":4,"title":"Hotfix","due_date":"2025-11-15","estimated_hours":1,"importance":8,"dependencies":[],"created_at":"2025-11-04T12:00:00.000Z"},
+  {"id":5,"title":"Refactor","due_date":"2025-11-30","estimated_hours":5,"importance":6,"dependencies":[1],"created_at":"2025-11-05T13:00:00.000Z"},
+  {"id":6,"title":"Documentation","due_date":"2025-12-05","estimated_hours":3,"importance":5,"dependencies":[3],"created_at":"2025-11-06T14:00:00.000Z"},
+  {"id":7,"title":"Integration","due_date":"2025-11-22","estimated_hours":6,"importance":4,"dependencies":[3,5],"created_at":"2025-11-07T15:00:00.000Z"},
+  {"id":8,"title":"Deploy","due_date":"2025-11-18","estimated_hours":2,"importance":3,"dependencies":[],"created_at":"2025-11-08T16:00:00.000Z"},
+  {"id":9,"title":"UXReview","due_date":"2025-11-27","estimated_hours":4,"importance":2,"dependencies":[4],"created_at":"2025-11-09T17:00:00.000Z"},
+  {"id":10,"title":"DataMigration","due_date":"2025-12-10","estimated_hours":10,"importance":1,"dependencies":[5,8],"created_at":"2025-11-10T18:00:00.000Z"}
+]
+```
+### **📌 Test Case 2 — Cycle Detection**
+
+Ensures cycle detection works correctly and the analyzer does not proceed with invalid graphs.
+
+**Input 1 (simple 2-node cycle):**
+```json
+[
+  {"id":1,"title":"A","dependencies":[2]},
+  {"id":2,"title":"B","dependencies":[1]}
+]
+
+[
+  {"id":1,"dependencies":[2]},
+  {"id":2,"dependencies":[3]},
+  {"id":3,"dependencies":[1]}
+]
+
+
+```
+Expected:
+Cycle must be detected
+Analyzer should not return sorted output
+
+### Test Case 3 — Missing Fields & Overdue Handling
+
+Verifies the analyzer does not break when some fields are missing and handles overdue tasks correctly.
+
+**Input:**
+```json
+[
+  {"id":1,"title":"NoDate","estimated_hours":2,"importance":5,"dependencies":[]},
+  {"id":2,"title":"NoEst","due_date":"2025-11-28","importance":7,"dependencies":[]},
+  {"id":3,"title":"Overdue","due_date":"2025-11-01","estimated_hours":1,"importance":8,"dependencies":[]}
+]
+```
+
+Expected:
+
+No cycle
+
+Missing values should not cause errors
+
+Overdue task should receive highest urgency score
