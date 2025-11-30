@@ -242,3 +242,11 @@ No cycle
 Missing values should not cause errors
 
 Overdue task should receive highest urgency score
+
+### Desktop View 
+<img width="1675" height="964" alt="image" src="https://github.com/user-attachments/assets/48fff4b3-92ea-4779-82c6-bb56b7767de6" />
+
+### Mobile View
+<img width="615" height="1052" alt="image" src="https://github.com/user-attachments/assets/1564c2c7-0023-4cb6-9907-7bee5e24fec3" />
+
+
